@@ -17,7 +17,6 @@ extraFeatures = [("bedrooms_squared", (^2) . bedrooms),
 
 
 features_1 = [
-           ("intercept", const 1),
            ("sqft_living", sqft_living),
            ("bedrooms", bedrooms),
            ("bathrooms", bathrooms),
@@ -48,13 +47,13 @@ main = do
                         test_feature_names = map fst extraFeatures
                         test_feature_means = map (feature_mean h) test_feature_names 
                         model1 = create test_inputs features_1 output
-                        model2 = create test_inputs features_2 output
-                        model3 = create test_inputs features_3 output
+                        --model2 = create test_inputs features_2 output
+                        --model3 = create test_inputs features_3 output
                     putStrLn "test feature means:"
                     print $ zip test_feature_names test_feature_means
-                    putStrLn $ "model1 weights:\n" ++ (show (model_weights model1))
-                    putStrLn $ "model2 weights:\n" ++ (show (model_weights model2))
-                    putStrLn $ "model3 weights:\n" ++ (show (model_weights model3))
+                    putStrLn $ "model1 weights:\n" ++ print_weights (model_weights model1)
+                    --putStrLn $ "model2 weights:\n" ++ print_weights (model_weights model2)
+                    --putStrLn $ "model3 weights:\n" ++ print_weights (model_weights model3)
                     putStrLn $ "model1 rss = " ++ (show (model_rss model1))
-                    putStrLn $ "model2 rss = " ++ (show (model_rss model2))
-                    putStrLn $ "model3 rss = " ++ (show (model_rss model3))
+                    --putStrLn $ "model2 rss = " ++ (show (model_rss model2))
+                    --putStrLn $ "model3 rss = " ++ (show (model_rss model3))

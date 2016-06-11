@@ -52,13 +52,17 @@ print_weights (WV name_indexes values) =
 
 -- Create a model from a list of records, a list of features, and the output
 -- accessor function.  This computes the weight vector as well.
+--
+-- Add an initial feature as well, containing just 1's.  Make sure that the
+-- normalization that is applied to other features is not applied to this
+-- feature.
 create :: [a] -> [(String, a -> Double)] -> (String, a -> Double) -> Model
 create rows features (name, output) = 
     let fmat = feature_matrix rows features
         nn = length rows
         observations = FV name (fromListUnboxed (Z:.(nn::Int):.(1::Int)) (Data.List.map output rows))
         e = 0.01*(fromIntegral nn) -- convergence criterion
-        n = 0.001 -- step size
+        n = 0.1 -- step size
         (weights,iters) = gradient_descent fmat observations (empty_weight fmat) e n
         predictions = predict fmat weights
         residuals = rss observations predictions
@@ -85,14 +89,14 @@ feature_names (FM name_indexes _) = Prelude.map fst name_indexes
 -- 1. 
 feature_matrix :: [a] -> [(String, a -> Double)] -> FeatureMatrix
 feature_matrix inputs hs = 
-    let n = length inputs
-        d = length hs
-        names = "ones":(Data.List.map fst hs)
-        means = (Data.List.map mean [[h(row) | row <- inputs] | (_, h) <- hs])
-        sds   = (Data.List.map stdev [[h(row) | row <- inputs] | (_, h) <- hs])
+    let hs' = ("w0", const 1):hs
+        n = length inputs
+        d = length hs'
+        names = (Data.List.map fst hs')
+        means = 0:(Data.List.map mean [[h(row) | row <- inputs] | (_, h) <- hs])
+        sds   = 1:(Data.List.map stdev [[h(row) | row <- inputs] | (_, h) <- hs])
         name_indexes = Prelude.zip names (Prelude.zip3 [0..] means sds)
-        wut = trace ("name_indexes = " ++ show name_indexes) ()
-        hs_mean_sd = Data.List.map (\((_,h),m,sd) -> (/sd) . (+(-m)) . h) (zip3 hs means sds)
+        hs_mean_sd = Data.List.map (\((_,h),m,sd) -> (/sd) . (+(-m)) . h) (zip3 hs' means sds)
         --hs_mean_sd = Data.List.map (\((_,h),m,sd) -> h) (zip3 hs means sds)
         dat = [hms(row) | row <- inputs, hms <- hs_mean_sd]
         h = fromListUnboxed (Z:.n:.d) dat 
