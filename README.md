@@ -6,6 +6,7 @@ TODO:
     Repa, Accelerate)
 * support an Accelerate backend
 * replace the use of lists in the interface with vectors
+* replace the use of strings with text
 * verify appropriate compilation and runtime options are enabled and 
   support optimal multi-core utilization.
 
