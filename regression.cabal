@@ -1,6 +1,6 @@
 name:                regression
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            multiple linear regression with gradient descent
 description:         Please see README.md
 homepage:            https://github.com/markrgrant/regression#readme
 license:             BSD3
@@ -15,43 +15,11 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib, Stat, House, FeatureChart, Regression
-  build-depends:       base >= 4.7 && < 5,
-                       Chart
-                     , Chart-cairo
-                     , cassava
+  exposed-modules:     Regression
+                     , Stat
+  build-depends:       base >= 4.7 && < 5
                      , accelerate
                      , vector
-                     , repa
-                     , repa-algorithms
-                     , repa-io
-                     , bytestring
-                     , text
-  default-language:    Haskell2010
-
-executable week1
-  hs-source-dirs:      app
-  main-is:             Week1.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , regression
-                     , Chart
-                     , Chart-cairo
-                     , bytestring
-                     , text
-                     , vector
-                     , cassava
-  default-language:    Haskell2010
-
-executable week2
-  hs-source-dirs:      app
-  main-is:             Week2.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , regression
-                     , bytestring
-                     , vector
-                     , cassava
                      , repa
                      , repa-algorithms
   default-language:    Haskell2010
@@ -60,11 +28,19 @@ executable week2
 test-suite tests
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
+  main-is:             Main.hs
   build-depends:       base
                      , regression
+                     , Chart
+                     , Chart-cairo
+                     , cassava
+                     , bytestring
+                     , text
+                     , vector
+
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
+
 
 source-repository head
   type:     git

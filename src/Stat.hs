@@ -1,27 +1,29 @@
+-- Various stat functions.   This library has no dependencies.
+-- It may be best to switch to operating on Repa arrays.
 module Stat where
 
-import qualified Data.Vector as V
 
 
--- Perform simple linear regression, returning the slope and
--- intercept
-slr rows xgetter ygetter =
-    let xvalues   = V.map xgetter rows 
-        yvalues   = V.map ygetter rows
-        n         = realToFrac $ V.length xvalues
-        sumx      = V.sum xvalues
-        sumy      = V.sum yvalues
-        sumxx     = V.sum $ V.zipWith (*) xvalues xvalues
-        sumxy     = V.sum $ V.zipWith (*) xvalues yvalues
-        slope     = (sumxy - sumy*sumx / n) / (sumxx - sumx*sumx / n)
-        intercept = (sumy - slope*sumx) / n
-    in (slope, intercept)
+mean :: [Double] -> Double
+mean lst = (sum lst) / (fromIntegral (length lst))
 
 
--- compute the residual sum of squares
-rss rows xgetter ygetter slope intercept =
-    let xvalues   = V.map xgetter rows 
-        yvalues   = V.map ygetter rows
-        ypred     = V.map (\x -> x*slope + intercept) xvalues
-        rss       = V.sum $ V.zipWith (\y y' -> (y - y')**2)  yvalues ypred
-    in rss
+range :: [Double] -> Double
+range lst = 
+    let x1 = minimum lst
+        x2 = maximum lst
+    in x2 - x1
+
+
+-- sample standard deviation
+stdev :: [Double] -> Double
+stdev lst = sqrt (var lst)
+
+
+var :: [Double] -> Double
+var lst = 
+    let m = mean lst
+    in sum (map (\x -> (x - m)^2) lst)
+
+
+

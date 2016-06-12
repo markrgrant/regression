@@ -1,12 +1,24 @@
 -- An abstract data type for performing multiple linear regression.
 
-module Regression where
+module Regression (
+    model_features,
+    model_outputs,
+    model_weights,
+    model_predictions,
+    model_rss,
+    model_iterations,
+    feature_mean,
+    create_model,
+    create_features,
+    predict
+) where
 
 import Data.Array.Repa as Repa hiding ((++))
 import Data.Array.Repa.Algorithms.Matrix (mmultP)
 import Data.List hiding (transpose)
 import Data.Maybe (fromJust)
 import Debug.Trace (trace)
+import Stat (range)
 
 
 -- A model is a feature matrix, a feature vector representing the observed
@@ -25,7 +37,7 @@ data Model = MO {
 -- A two-dimensional matrix, whose columns represent named
 -- features.
 data FeatureMatrix = FM {
-    fm_name_indexes:: [(String, (Int, Double, Double))],
+    fm_name_indexes:: [(String, Int)],
     fm_values :: (Array U DIM2 Double)
 } deriving (Show)
 
@@ -34,20 +46,35 @@ data FeatureMatrix = FM {
 data FeatureVector = FV {
     fv_name :: String,
     fv_values :: (Array U DIM2 Double)
-} deriving (Show)
+}
+
+instance Show FeatureVector where
+    show (FV name values) =
+        name ++ " = " ++ show (toList values)
+
 
 
 -- A vector of weights.  Each weight corresponds to a named feature.
 data WeightVector = WV {
-    wv_name_indexes :: [(String, (Int, Double, Double))],
+    wv_name_indexes :: [(String, Int)],
     wv_values :: (Array U DIM2 Double)
-} deriving (Show)
+}
 
-
-print_weights :: WeightVector -> String
-print_weights (WV name_indexes values) =
+instance Show WeightVector where
+    show (WV name_indexes values) =
         concatMap showWeight (zip name_indexes (toList values))
-        where showWeight ((name, (i, mean, sd)), value) = name ++ " = " ++ show (sd * value + mean) ++ "\n"
+        where showWeight ((name, i), value) = name ++ " = " ++ show value ++ "\n"
+
+
+
+feature_mean :: FeatureMatrix -> String -> Double
+feature_mean (FM name_indexes h) name =
+    let i = fromJust $ Data.List.lookup name name_indexes
+        column = slice h (Any :. (i::Int)) 
+        (Z:.j) = extent column
+        [total] = sumAllP column
+    in total/(fromIntegral j)
+
 
 
 -- Create a model from a list of records, a list of features, and the output
@@ -56,14 +83,12 @@ print_weights (WV name_indexes values) =
 -- Add an initial feature as well, containing just 1's.  Make sure that the
 -- normalization that is applied to other features is not applied to this
 -- feature.
-create :: [a] -> [(String, a -> Double)] -> (String, a -> Double) -> Model
-create rows features (name, output) = 
-    let fmat = feature_matrix rows features
+create_model :: [a] -> [(String, a -> Double)] -> (String, a -> Double) -> [Double] -> Double -> Double -> Model
+create_model rows features (output_name, output) initial_weights e n = 
+    let fmat = create_features rows features
         nn = length rows
-        observations = FV name (fromListUnboxed (Z:.(nn::Int):.(1::Int)) (Data.List.map output rows))
-        e = 0.01*(fromIntegral nn) -- convergence criterion
-        n = 0.1 -- step size
-        (weights,iters) = gradient_descent fmat observations (empty_weight fmat) e n
+        observations = FV output_name (fromListUnboxed (Z:.(nn::Int):.(1::Int)) (Data.List.map output rows))
+        (weights,iters) = gradient_descent fmat observations (create_weights fmat initial_weights) e n
         predictions = predict fmat weights
         residuals = rss observations predictions
     in MO fmat observations weights predictions residuals iters
@@ -77,9 +102,17 @@ predict (FM _ h) (WV _ w) =
     in FV "" y'
 
 
--- Retrieve the feature names used to construct the feature matrix.
-feature_names :: FeatureMatrix -> [String]
-feature_names (FM name_indexes _) = Prelude.map fst name_indexes
+-- Generates the feature matrix, usually denoted as H, with N rows and
+-- D features where D is the length of the feature list.
+create_features :: [a] -> [(String, a -> Double)] -> FeatureMatrix
+create_features inputs hs = 
+    let n = length inputs
+        d = length hs
+        names = (Data.List.map fst hs)
+        name_indexes = Prelude.zip names [0..]
+        dat = [h(row) | row <- inputs, (_,h) <- hs]
+        h = fromListUnboxed (Z:.n:.d) dat 
+    in FM name_indexes h
 
 
 -- Generates the feature matrix, usually denoted as H, with N rows and
@@ -87,55 +120,21 @@ feature_names (FM name_indexes _) = Prelude.map fst name_indexes
 --
 -- An additional feature is added to the features representing the value
 -- 1. 
-feature_matrix :: [a] -> [(String, a -> Double)] -> FeatureMatrix
-feature_matrix inputs hs = 
+scaled_feature_matrix :: [a] -> [(String, a -> Double)] -> FeatureMatrix
+scaled_feature_matrix inputs hs = 
     let hs' = ("w0", const 1):hs
         n = length inputs
         d = length hs'
         names = (Data.List.map fst hs')
-        means = 0:(Data.List.map mean [[h(row) | row <- inputs] | (_, h) <- hs])
-        sds   = 1:(Data.List.map stdev [[h(row) | row <- inputs] | (_, h) <- hs])
-        name_indexes = Prelude.zip names (Prelude.zip3 [0..] means sds)
-        hs_mean_sd = Data.List.map (\((_,h),m,sd) -> (/sd) . (+(-m)) . h) (zip3 hs' means sds)
-        --hs_mean_sd = Data.List.map (\((_,h),m,sd) -> h) (zip3 hs means sds)
-        dat = [hms(row) | row <- inputs, hms <- hs_mean_sd]
+        --means = 0:(Data.List.map mean [[h(row) | row <- inputs] | (_, h) <- hs])
+        --sds   = 1:(Data.List.map stdev [[h(row) | row <- inputs] | (_, h) <- hs])
+        mins = 0:(Data.List.map minimum [[h(row) | row <- inputs] | (_, h) <- hs])
+        r = 1:(Data.List.map range [[h(row) | row <- inputs] | (_, h) <- hs])
+        name_indexes = Prelude.zip names [0..]
+        hs_mean_range = Data.List.map (\((_,h),m,ra) -> (/ra) . (+(-m)) . h) (zip3 hs' mins r)
+        dat = [hms(row) | row <- inputs, hms <- hs_mean_range]
         h = fromListUnboxed (Z:.n:.d) dat 
     in FM name_indexes h
-
-
-mean :: [Double] -> Double
-mean lst = (sum lst) / (fromIntegral (length lst))
-
-
--- sample standard deviation
-stdev :: [Double] -> Double
-stdev lst = sqrt (var lst)
-
-
-var :: [Double] -> Double
-var lst = 
-    let m = mean lst
-    in sum (Data.List.map (\x -> (x - m)^2) lst)
-
-
-feature_mean :: FeatureMatrix -> String -> Double
-feature_mean (FM name_indexes h) name =
-    let (i,mean,sd) = fromJust $ Data.List.lookup name name_indexes
-    in mean
-
-{-
-traverse :: (Shape sh', Shape sh, Source r a)
-     => Array r sh a            -- Source array
-     -> (sh -> sh')             -- Function to produce the extent of the result.
-     -> ((sh -> a) -> sh' -> b) -- Function to produce elements of the result.
-                                -- It is passed a lookup function to
-                                -- get elements of the source.
-     -> Array D sh' b
--}
-
--- Return the feature with the given name in the feature vector.
-lookup :: FeatureMatrix -> String -> FeatureVector
-lookup matrix string = undefined
 
 
 -- Compute the residual sum of squares from the observed output and
@@ -152,19 +151,20 @@ rss' v1 v2 =
     in result
 
 
+{-
 -- Get the weight of a particular feature in a weight vector.
-weight :: WeightVector -> String -> Maybe Double
-weight (WV name_indexes v) name = do
-    (index, _, _) <- Prelude.lookup name name_indexes
+weight_for_feature :: WeightVector -> String -> Maybe Double
+weight_for_feature (WV name_indexes v) name = do
+    index <- Prelude.lookup name name_indexes
     Just $ v ! (Z :. index :. 1)
-
+-}
 
 -- Get an empty vector of weights whose feature names are the same, and
 -- in the same order, as the given feature matrix.
-empty_weight :: FeatureMatrix -> WeightVector
-empty_weight (FM name_indexes h) = 
+create_weights :: FeatureMatrix -> [Double] -> WeightVector
+create_weights (FM name_indexes h) weights = 
     let (Z:.i:.j) = extent h
-    in WV name_indexes $ computeS $ fromFunction (Z :. j :. 1) (\(Z:.j:.i) -> 0 :: Double)
+    in WV name_indexes $ computeS $ fromFunction (Z :. j :. 1) (\(Z:.j:.i) -> weights !! j :: Double)
 
 
 -- perform gradient descent, updating the weight matrix until the residual
@@ -183,12 +183,12 @@ gradient_descent' :: Array U DIM2 Double -> Array U DIM2 Double -> Array U DIM2 
 gradient_descent' h ht y w e n c =
     let grad = gradient h ht y w -- (-2H^t(y-Hw))
         grad_len = magnitude grad  -- grad RSS(w) == ||2H^t(y-HW)||
-    in if (trace ("gradient size = " ++ show(grad_len)) grad_len) < e
+    in if (trace ("gradient size = " ++ show(grad_len) ++ ", tolerance = " ++ (show e)) grad_len) < e
     --in if grad_len < e
-            then (w, c)
-            else let delta = Repa.map (*(-n)) grad -- (2nH^t(y-Hw))
-                     [w'] = computeP $ w +^ delta -- 
-                 in gradient_descent' h ht y w' e n (c+1)
+        then (w, c)
+        else let delta = Repa.map (*(-n)) grad -- (2nH^t(y-Hw))
+                 [w'] = computeP $ w +^ delta -- 
+             in gradient_descent' h ht y w' e n (c+1)
 
 
 -- calculate the gradient of the residual sum of squares (-2H^t(y-Hw)).
