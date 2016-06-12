@@ -8,11 +8,9 @@ TODO:
 * replace the use of lists in the interface with vectors
 * replace the use of strings with text
 * verify appropriate compilation and runtime options are enabled and 
-  support optimal multi-core utilization.
-
-Notes:
-
-The parameters to pass to ghc during compilation and execution with a
-repa on a quad core system:
-$ ghc -O2 --make -threaded -rtsopts source.hs
-$ ./repa "haskell.jpg" +RTS -N4
+  support optimal multi-core utilization. For example, the parameters to pass
+  to ghc during compilation and execution with Repa on a quad core system:
+    ```
+    $ ghc -O2 --make -threaded -rtsopts source.hs
+    $ ./source <args> +RTS -N4
+    ```
