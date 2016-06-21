@@ -1,6 +1,7 @@
--- An abstract data type for performing multiple linear regression.
+-- An abstract data type for performing multiple linear regression,
+-- using Repa as the backend for matrix operations.
 
-module Regression (
+module Regression.Repa (
     model_features,
     model_outputs,
     model_weights,
@@ -8,17 +9,17 @@ module Regression (
     model_rss,
     model_iterations,
     feature_mean,
-    create_model,
-    create_features,
-    predict
+    create_model, create_features,
+    predict,
+    powers,
+    normalize
 ) where
-
 import Data.Array.Repa as Repa hiding ((++))
 import Data.Array.Repa.Algorithms.Matrix (mmultP)
 import Data.List hiding (transpose)
 import Data.Maybe (fromJust)
 import Debug.Trace (trace)
-import Stat (range)
+import Stat (range, mean, stdev)
 
 
 -- A model is:
@@ -151,7 +152,8 @@ gradient_descent' :: Array U DIM2 Double -> Array U DIM2 Double -> Array U DIM2 
 gradient_descent' h ht y w e n c =
     let grad = gradient h ht y w -- (-2H^t(y-Hw))
         grad_len = magnitude grad  -- grad RSS(w) == ||2H^t(y-HW)||
-    in if grad_len < e
+    --in if grad_len < e
+    in if (trace ("gradient = " ++ show grad_len) grad_len) < e
         then (w, c)
         else let delta = Repa.map (*(-n)) grad -- (2nH^t(y-Hw))
                  [w'] = computeP $ w +^ delta -- 
@@ -177,3 +179,18 @@ magnitude :: Array U DIM2 Double -> Double
 magnitude vec = 
     let [total] = Repa.sumAllP $ Repa.map (\y -> y^2) vec
     in sqrt total
+
+
+-- Given a feature, computes polynomial powers of that feature from 
+-- 1 (the original feature) up to and including n. 
+powers :: (String, a -> Double) -> Int -> [(String, a -> Double)]
+powers (name, f) n = Data.List.map  (\i -> (name ++ (show i), (\a -> (f a)^i))) [1..n]
+
+
+-- given a list of values and a feature, return a normalized version of that
+-- feature where the mean of the feature is subtracted from each feature and
+-- the result is divided by the standard deviation of the feature.
+normalize :: [a] -> (a -> Double) -> a -> Double
+normalize xs f = (/sdxs) . (+(-meanxs)) . f
+    where meanxs = mean (Data.List.map f xs)
+          sdxs = stdev (Data.List.map f xs)
