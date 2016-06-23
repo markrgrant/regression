@@ -1,5 +1,6 @@
 A library for performing multiple linear regression on a list of data using
-Repa for better multicore performance. 
+Repa for better multicore performance. An HMatrix implementation is also under
+development. 
 
 TODO: 
 * performance analysis comparison of different backends (native arrays,
