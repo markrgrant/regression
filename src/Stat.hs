@@ -3,6 +3,8 @@
 module Stat where
 
 
+import Data.Set
+
 
 mean :: [Double] -> Double
 mean lst = (sum lst) / (fromIntegral (length lst))
@@ -23,7 +25,15 @@ stdev lst = sqrt (var lst)
 var :: [Double] -> Double
 var lst = 
     let m = mean lst
-    in sum (map (\x -> (x - m)^2) lst)
+    in sum (Prelude.map (\x -> (x - m)^2) lst)
 
 
+-- N(B)
+freq :: Ord a => Set a -> [a] -> Int
+freq b xs = length $ Prelude.filter (\x -> member x b) xs
+
+
+-- ^P(B)
+relfreq :: (Ord a, Fractional b) => Set a -> [a] -> b
+relfreq b xs = fromIntegral (freq b xs) / fromIntegral (length xs)
 
