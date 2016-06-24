@@ -1,7 +1,6 @@
-A library for performing multiple linear regression on a list of data.
-
-Two different approaches are taken.  The first uses Repa and the second
-uses the HMatrix library (which in turn uses LAPACK).
+A library for performing multiple linear regression on a list of data using
+Repa for better multicore performance. An HMatrix implementation is also under
+development. 
 
 Much work remains to be done.
 
@@ -26,13 +25,3 @@ TODO:
 $ ghc -O2 --make -threaded -rtsopts source.hs
 $ ./source <args> +RTS -N4
 ```
-
-
-## Performing Regression
-
-1. Populate a list of type [a], where each row is a list of inputs.  
-2. Create a list of feature functions of type (a -> Double), where each
-   function takes a row of input and returns the value of the feature.
-3. Create a 
-3. Decide on the method to be used for optimization.  One option is iterative
-   gradient descent.  Another 
