@@ -23,6 +23,60 @@ library
                      , repa-algorithms
                      , hmatrix
                      , vector
+                     , containers
+  default-language:    Haskell2010
+
+executable repagradient
+  hs-source-dirs:      app
+  main-is:             RepaGradient.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , regression
+                     , Chart
+                     , Chart-cairo
+                     , bytestring
+                     , text
+                     , vector
+                     , cassava
+                     , random
+                     , random-shuffle
+                     , hmatrix
+  default-language:    Haskell2010
+
+
+executable hmatrixgradient
+  hs-source-dirs:      app
+  main-is:             HMatrixGradient.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , regression
+                     , Chart
+                     , Chart-cairo
+                     , bytestring
+                     , text
+                     , vector
+                     , cassava
+                     , random
+                     , random-shuffle
+                     , hmatrix
+  default-language:    Haskell2010
+
+
+executable hmatrixnewtons
+  hs-source-dirs:      app
+  main-is:             HMatrixNewtons.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , regression
+                     , Chart
+                     , Chart-cairo
+                     , bytestring
+                     , text
+                     , vector
+                     , cassava
+                     , random
+                     , random-shuffle
+                     , hmatrix
   default-language:    Haskell2010
 
 
