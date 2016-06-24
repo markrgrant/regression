@@ -47,12 +47,14 @@ module Regression.HMatrix (
     model_rss,
     create_model,
     create_features,
+    create_weights,
     predict,
     powers,
     normalize,
     newtons_method,
     newtons_method_with_norm,
-    cross_validate
+    cross_validate,
+    gradient_descent
 ) where
 
 import Numeric.LinearAlgebra hiding (magnitude)
@@ -90,17 +92,16 @@ data FeatureVector = FV {
     fv_name :: String,
     fv_values :: Vector Double
 }
+instance Show FeatureVector where
+    show (FV name values) =
+        name ++ " = " ++ show (toList values)
+
 
 type Feature a = (String, a -> Double)
 
 type Output a = (String, a -> Double)
 
 type Optimizer = FeatureMatrix -> FeatureVector -> WeightVector
-
-
-instance Show FeatureVector where
-    show (FV name values) =
-        name ++ " = " ++ show (toList values)
 
 
 -- A vector of weights.  Each weight corresponds to a feature in the
@@ -203,7 +204,8 @@ gradient_descent' :: Double -> Double -> Vector Double -> Matrix Double ->
 gradient_descent' e n w h ht y =
     let grad = gradient h ht y w -- (-2H^t(y-Hw))
         grad_len = magnitude grad  -- grad RSS(w) == ||2H^t(y-HW)||
-    in if grad_len < e
+    --in if grad_len < e
+    in if (trace ("gradient = " ++ show grad_len) grad_len) < e
         then w
         else let delta = cmap (*(-n)) grad -- (2nH^t(y-Hw))
                  w' = w + delta
@@ -246,10 +248,9 @@ normalize xs f = (/sdxs) . (+(-meanxs)) . f
 -- Compute the average k-fold cross-validation error for a given L2 penalty and
 -- a given split size k.
 -- Note that the rows should be shuffled before they are provided.
-cross_validate :: Int -> [a] -> [Feature a] -> Output a  -> Matrix Double -> Double
-cross_validate k rows features o@(output_name, output) l2 = kmean
+cross_validate :: Int -> [a] -> [Feature a] -> Output a  -> Optimizer -> Double
+cross_validate k rows features o@(output_name, output) optimizer = kmean
     where ksplits         = ksplit k rows
-          optimizer       = newtons_method_with_norm l2
           training_data   = map fst ksplits
           valid_data      = map snd ksplits
           trained_models  = map (\rows -> create_model rows features o optimizer) training_data
