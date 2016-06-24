@@ -7,11 +7,13 @@ module Regression.Repa (
     model_weights,
     model_predictions,
     model_rss,
-    model_iterations,
     feature_mean,
-    create_model, create_features,
+    create_model, 
+    create_features,
+    create_weights,
     predict,
     powers,
+    gradient_descent,
     normalize
 ) where
 import Data.Array.Repa as Repa hiding ((++))
@@ -33,8 +35,7 @@ data Model = MO {
     model_outputs     :: FeatureVector,
     model_weights     :: WeightVector,
     model_predictions :: FeatureVector,
-    model_rss         :: Double,
-    model_iterations  :: Int
+    model_rss         :: Double
 } deriving (Show)
 
 
@@ -54,6 +55,12 @@ data FeatureVector = FV {
 instance Show FeatureVector where
     show (FV name values) =
         name ++ " = " ++ show (toList values)
+
+type Feature a = (String, a -> Double)
+
+type Output a = (String, a -> Double)
+
+type Optimizer = FeatureMatrix -> FeatureVector -> WeightVector
 
 
 -- A vector of weights.  Each weight corresponds to a feature in the
@@ -83,16 +90,16 @@ feature_mean (FM name_indexes h) name =
 -- accessor function.  This computes the weight vector as well.  This function
 -- does not scale the features nor does it add an intercept feature (a feature
 -- whose values are all 1). 
-create_model :: [a] -> [(String, a -> Double)] -> (String, a -> Double) ->
-    [Double] -> Double -> Double -> Model
-create_model rows features (output_name, output) initial_weights e n = 
-    let fmat = create_features rows features
+create_model :: [a] -> [Feature a] -> Output a -> Optimizer -> Model
+create_model rows features (output_name, output) optimizer = 
+    let fmat = create_features features rows
         nn = length rows
         observations = FV output_name (fromListUnboxed (Z:.(nn::Int):.(1::Int)) (Data.List.map output rows))
-        (weights,iters) = gradient_descent fmat observations (create_weights fmat initial_weights) e n
-        predictions = predict fmat weights
-        residuals = rss observations predictions
-    in MO fmat observations weights predictions residuals iters
+        --weights      = gradient_descent fmat observations (create_weights fmat initial_weights) e n
+        weights      = optimizer fmat observations
+        predictions  = predict fmat weights
+        residuals    = rss observations predictions
+    in MO fmat observations weights predictions residuals
 
 
 -- Multiplies a feature matrix by a weights vector to obtain a prediction of
@@ -105,8 +112,8 @@ predict (FM _ h) (WV _ w) =
 
 -- Generates the feature matrix, usually denoted as H, with N rows and
 -- D features where D is the length of the feature list.
-create_features :: [a] -> [(String, a -> Double)] -> FeatureMatrix
-create_features inputs hs = 
+create_features :: [Feature a] -> [a] -> FeatureMatrix
+create_features hs inputs = 
     let n = length inputs
         d = length hs
         names = (Data.List.map fst hs)
@@ -139,25 +146,24 @@ create_weights (FM name_indexes h) weights =
 -- Performs gradient descent, updating the weights  until the residual
 -- sum of squares is less than the epsilon value e, at which point the
 -- weight matrix w is returned.  n is the step size.
-gradient_descent :: FeatureMatrix -> FeatureVector -> WeightVector ->
-    Double -> Double -> (WeightVector, Int)
-gradient_descent (FM _ f) (FV _ o) (WV name w) e n =
+gradient_descent :: Double -> Double -> WeightVector -> Optimizer
+gradient_descent e n (WV name w) (FM _ f) (FV _ o) =
     let [ft] = computeP $ transpose f
-        (weights, count) = gradient_descent' f ft o w e n 0
-    in (WV name weights, count)
+        weights = gradient_descent' e n w f ft o
+    in WV name weights
 
 
-gradient_descent' :: Array U DIM2 Double -> Array U DIM2 Double -> Array U DIM2 Double ->
-    Array U DIM2 Double -> Double -> Double -> Int -> (Array U DIM2 Double, Int)
-gradient_descent' h ht y w e n c =
+gradient_descent' :: Double -> Double -> Array U DIM2 Double -> Array U DIM2 Double -> Array U DIM2 Double ->
+    Array U DIM2 Double -> Array U DIM2 Double
+gradient_descent' e n w h ht y =
     let grad = gradient h ht y w -- (-2H^t(y-Hw))
         grad_len = magnitude grad  -- grad RSS(w) == ||2H^t(y-HW)||
     --in if grad_len < e
     in if (trace ("gradient = " ++ show grad_len) grad_len) < e
-        then (w, c)
+        then w
         else let delta = Repa.map (*(-n)) grad -- (2nH^t(y-Hw))
                  [w'] = computeP $ w +^ delta -- 
-             in gradient_descent' h ht y w' e n (c+1)
+             in gradient_descent' e n w' h ht y
 
 
 -- Calculates the gradient of the residual sum of squares (-2H^t(y-Hw)).
